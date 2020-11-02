@@ -109,6 +109,7 @@ class Message:
 
     def read(self):
         self._read()
+        # print('reading')
 
         if self._jsonheader_len is None:
             self.process_protoheader()
@@ -118,6 +119,7 @@ class Message:
                 self.process_jsonheader()
 
         if self.jsonheader:
+            print('reading END')
             if self.response is None:
                 self.process_response()
 
@@ -164,7 +166,9 @@ class Message:
 
     def process_protoheader(self):
         hdrlen = 2
+        # print('process_protoheader')
         if len(self._recv_buffer) >= hdrlen:
+            print('IN process_protoheader')
             self._jsonheader_len = struct.unpack(
                 ">H", self._recv_buffer[:hdrlen])[0]
             self._recv_buffer = self._recv_buffer[hdrlen:]

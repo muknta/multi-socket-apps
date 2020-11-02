@@ -4,40 +4,63 @@ import sys
 import socket
 import selectors
 from threading import Thread
+from pynput.keyboard import Listener
 import traceback
 # package with Message class
 import lib_client
 
-import platform
-sys_name = platform.system()
+# import platform
+# sys_name = platform.system()
 
-if sys_name == 'Windows':
-    import msvcrt as inp_lib
-else:
-    import getch as inp_lib
+# if sys_name == 'Windows':
+#     import msvcrt as inp_lib
+# else:
+#     import getch as inp_lib
 
 sel = selectors.DefaultSelector()
 
 quit_key_pressed = False
 stat_key_pressed = False
 
-def press_key():
-    print("Press 's' for statistics or 'q' to quit.")
-    return inp_lib.getche()
+# def press_key():
+#     print("Press 's' for statistics or 'q' to quit.")
+#     stdscr = curses.initscr()
+#     return stdscr.getch()
+
+# Listener function
+def on_press(key):
+    global quit_key_pressed, stat_key_pressed
+    print('itss on_press on_press on_press')
+
+    try:
+        if key.char is 's':
+            print('itss sssssssssssssss')
+            stat_key_pressed = True
+        elif key.char is 'q':
+            print('itss qqqqqqqqqqqqqqq')
+            quit_key_pressed = True
+    except AttributeError as e:
+        print(f'Exception: {e}')
+
 
 def detect_key_press():
-    global quit_key_pressed, stat_key_pressed
+    with Listener(on_press=on_press) as listener:
+        listener.join()
 
-    print('first, im hereeee')
-    char = press_key()
-    while char is not 'q':
-        print('SEC, im hereeee')
-        char = press_key()
-        if char is 's':
-            print('THI, stat_key_pressed = True')
-            stat_key_pressed = True
-    print('THI, quit_key_pressedquit_key_pressedquit_key_pressed')
-    quit_key_pressed = True
+
+# def detect_key_press():
+#     global quit_key_pressed, stat_key_pressed
+
+#     print('first, im hereeee')
+#     char = press_key()
+#     while char is not 'q':
+#         print('SEC, im hereeee')
+#         char = press_key()
+#         if char is 's':
+#             print('THI, stat_key_pressed = True')
+#             stat_key_pressed = True
+#     print('THI, quit_key_pressedquit_key_pressedquit_key_pressed')
+#     quit_key_pressed = True
 
 
 def get_traceback(message):
@@ -71,23 +94,26 @@ try:
 
     while not quit_key_pressed:
         events = sel.select(timeout=1)
+        # print('FREEeeeeeeeeeeeeee333333333333')
         for key, mask in events:
             message = key.data
             try:
+                # print('FREEeeeeeeeeeeeeee22222222')
                 if mask:
                     if stat_key_pressed:
                         message.set_request(content=b"s")
-                        print('UNDER stat_key_pressed stat_key_pressed')
+                        # print('UNDER stat_key_pressed stat_key_pressed')
                         message.write()
                         stat_key_pressed = False
 
-                    print('FREEeeeeeeeeeeeeee')
+                    # print('FREEeeeeeeeeeeeeee')
                     message.read()
             except Exception:
                 get_traceback(message)
                 message.close()
         # Check for a socket being monitored to continue.
         if not sel.get_map():
+            print('FREEeeeeeeeeeeeeeeEEEEEEEENDDDDDDDDDDD')
             break
 except KeyboardInterrupt:
     print("caught keyboard interrupt, exiting")

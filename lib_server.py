@@ -28,7 +28,6 @@ class Message:
         self._jsonheader_len = None
         self.jsonheader = None
         self.request = None
-        self.response_created = False
         self.symb_increment = 0
 
     def _set_selector_events_mask(self, mode):
