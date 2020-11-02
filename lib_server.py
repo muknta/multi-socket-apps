@@ -12,6 +12,7 @@ from random import choice, randint
 import time
 
 MAX_CHARS_NUM = 5
+MAX_SLEEP_TIME = 5
 
 def get_rand_chars():
     chars = f'{ascii_uppercase}{ascii_lowercase}{digits}'
@@ -19,28 +20,18 @@ def get_rand_chars():
 
 
 class Message:
-    def __init__(self, selector, sock, addr):
+    def __init__(self, selector, sock, addr, mode):
         self.selector = selector
         self.sock = sock
         self.addr = addr
+        self.mode = mode
         self._recv_buffer = b""
         self._send_buffer = b""
         self._jsonheader_len = None
         self.jsonheader = None
         self.request = None
         self.symb_increment = 0
-
-    def _set_selector_events_mask(self, mode):
-        """Set selector to listen for events: mode is 'r', 'w', or 'rw'."""
-        if mode == "r":
-            events = selectors.EVENT_READ
-        elif mode == "w":
-            events = selectors.EVENT_WRITE
-        elif mode == "rw":
-            events = selectors.EVENT_READ | selectors.EVENT_WRITE
-        else:
-            raise ValueError(f"Invalid events mask mode {repr(mode)}.")
-        self.selector.modify(self.sock, events, data=self)
+        self.sleep_time = 0
 
     def _read(self):
         try:
@@ -53,22 +44,18 @@ class Message:
             if data:
                 self._recv_buffer += data
             else:
-                raise RuntimeError("Peer closed.")
+                raise RuntimeError("Peer closed")
 
     def _write(self):
         if self._send_buffer:
-            print("sending", repr(self._send_buffer), "to", self.addr)
             try:
                 # Should be ready to write
                 sent = self.sock.send(self._send_buffer)
             except BlockingIOError:
                 # Resource temporarily unavailable (errno EWOULDBLOCK)
-                pass
+                print(f'error: {e}')
             else:
                 self._send_buffer = self._send_buffer[sent:]
-                # Close when the buffer is drained. The response has been sent.
-                # if sent and not self._send_buffer:
-                #     self.close()
 
     def _json_encode(self, obj, encoding):
         return json.dumps(obj, ensure_ascii=False).encode(encoding)
@@ -81,9 +68,12 @@ class Message:
         tiow.close()
         return obj
 
-    def _create_message(
-        self, *, content_bytes, content_type, content_encoding
+    def _create_message(self, *,
+        content_bytes, content_type, content_encoding
     ):
+        if self.mode == 'user':
+            print(f"sending {content_bytes} to {self.addr}")
+            
         jsonheader = {
             "byteorder": sys.byteorder,
             "content-type": content_type,
@@ -95,33 +85,13 @@ class Message:
         message = message_hdr + jsonheader_bytes + content_bytes
         return message
 
-    # def _create_response_json_content(self):
-    #     action = self.request.get("action")
-    #     if action == "search":
-    #         query = self.request.get("value")
-    #         answer = request_search.get(query) or f'No match for "{query}".'
-    #         content = {"result": answer}
-    #     else:
-    #         content = {"result": f'Error: invalid action "{action}".'}
-    #     content_encoding = "utf-8"
-    #     response = {
-    #         "content_bytes": self._json_encode(content, content_encoding),
-    #         "content_type": "text/json",
-    #         "content_encoding": content_encoding,
-    #     }
-    #     return response
-
-    # def _create_response_binary_content(self):
-    #     response = {
-    #         "content_bytes": b"First 10 bytes of request: "
-    #         + self.request[:10],
-    #         "content_type": "binary/custom-server-binary-type",
-    #         "content_encoding": "binary",
-    #     }
-    #     return response
 
     def _create_binary_response(self):
-        time.sleep(2)
+        self.sleep_time = randint(1, MAX_SLEEP_TIME)
+        time.sleep(self.sleep_time)
+        print(f'sleepy for a {self.sleep_time}',
+            f'second{"" if self.sleep_time==1 else "s"}')
+
         chars = get_rand_chars()
         response = {
             "content_bytes": str.encode(chars),
@@ -132,7 +102,6 @@ class Message:
         return response
 
     def _create_statistics_response(self):
-        # time.sleep(2)
         response = {
             "content_bytes": b"Statistics: "
                 + str.encode(f'{self.symb_increment} symbols was delivered'),
@@ -163,17 +132,16 @@ class Message:
                 self.process_request()
 
     def write(self):
-        if self.request in (b"s", "s"):
+        if self.request is b"s":
             response = self._create_statistics_response()
-            print(1111111111111111111)
-            message = self._create_message(**response)
-            self._send_buffer += message
+            self.process_responce(response)
+
+            self._jsonheader_len = None
+            self.jsonheader = None
             self.request = None
         else:
-            print(22222222222222222222222)
             response = self._create_binary_response()
-            message = self._create_message(**response)
-            self._send_buffer += message
+            self.process_responce(response)
         self._write()
 
     def close(self):
@@ -181,14 +149,13 @@ class Message:
         try:
             self.selector.unregister(self.sock)
         except Exception as e:
-            print(f"error: selector.unregister() \
-                exception for {self.addr}: {repr(e)}")
-
+            print("error: selector.unregister() exception for",
+                f"{self.addr}: {repr(e)}")
         try:
             self.sock.close()
         except OSError as e:
-            print(f"error: socket.close() exception for \
-                {self.addr}: {repr(e)}")
+            print("error: socket.close() exception for",
+                f"{self.addr}: {repr(e)}")
         finally:
             # Delete reference to socket object for garbage collection
             self.sock = None
@@ -223,10 +190,14 @@ class Message:
         data = self._recv_buffer[:content_len]
         self._recv_buffer = self._recv_buffer[content_len:]
         self.request = data
-        print(f'received {self.jsonheader["content-type"]} \
-                request from {self.addr}')
-        self._set_selector_events_mask("rw")
+        if self.mode == 'debug':
+            print(f'received {self.jsonheader["content-type"]}',
+                f'request from {self.addr}')
+        elif self.mode == 'user':
+            print(f'received request from {self.addr}')
 
     def process_responce(self, response):
         message = self._create_message(**response)
         self._send_buffer += message
+        if self.mode == 'debug':
+            print(f"sending {repr(self._send_buffer)} to {self.addr}")

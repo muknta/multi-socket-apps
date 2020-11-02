@@ -6,30 +6,18 @@ import struct
 
 
 class Message:
-    def __init__(self, selector, sock, addr):
+    def __init__(self, selector, sock, addr, mode):
         self.selector = selector
         self.sock = sock
         self.addr = addr
+        self.mode = mode
         self.request = None
-        # self.mode = mode
         self._recv_buffer = b""
         self._send_buffer = b""
         self._request_queued = False
         self._jsonheader_len = None
         self.jsonheader = None
         self.response = None
-
-    def _set_selector_events_mask(self, mode):
-        """Set selector to listen for events: mode is 'r', 'w', or 'rw'."""
-        if mode == "r":
-            events = selectors.EVENT_READ
-        elif mode == "w":
-            events = selectors.EVENT_WRITE
-        elif mode == "rw":
-            events = selectors.EVENT_READ | selectors.EVENT_WRITE
-        else:
-            raise ValueError(f"Invalid events mask mode {repr(mode)}.")
-        self.selector.modify(self.sock, events, data=self)
 
     def _read(self):
         try:
@@ -46,13 +34,16 @@ class Message:
 
     def _write(self):
         if self._send_buffer:
-            print("sending", repr(self._send_buffer), "to", self.addr)
+            if self.mode == 'debug':
+                print(f"sending {repr(self._send_buffer)} to {self.addr}")
+            elif self.mode == 'user':
+                print((f"sending {self.request['content']} to {self.addr}"))
             try:
                 # Should be ready to write
                 sent = self.sock.send(self._send_buffer)
-            except BlockingIOError:
+            except BlockingIOError as e:
                 # Resource temporarily unavailable (errno EWOULDBLOCK)
-                pass
+                print(f'error: {e}')
             else:
                 self._send_buffer = self._send_buffer[sent:]
 
@@ -67,8 +58,8 @@ class Message:
         tiow.close()
         return obj
 
-    def _create_message(
-        self, *, content_bytes, content_type, content_encoding
+    def _create_message(self, *,
+        content_bytes, content_type, content_encoding
     ):
         jsonheader = {
             "byteorder": sys.byteorder,
@@ -81,24 +72,11 @@ class Message:
         message = message_hdr + jsonheader_bytes + content_bytes
         return message
 
-    # def _process_response_json_content(self):
-    #     content = self.response
-    #     result = content.get("result")
-    #     print(f"got result: {result}")
-
-    # def _process_response_binary_content(self):
-    #     content = self.response
-    #     print(f"got response: {repr(content)}")
 
     def _process_binary_response(self):
         content = self.response
         print(f"got response: {repr(content)}")
 
-    # def process_events(self, mask):
-    #     if mask & selectors.EVENT_READ:
-    #         self.read()
-    #     if mask & selectors.EVENT_WRITE:
-    #         self.write()
 
     def set_request(self, content):
         self.request = dict(
@@ -109,7 +87,6 @@ class Message:
 
     def read(self):
         self._read()
-        # print('reading')
 
         if self._jsonheader_len is None:
             self.process_protoheader()
@@ -119,7 +96,6 @@ class Message:
                 self.process_jsonheader()
 
         if self.jsonheader:
-            print('reading END')
             if self.response is None:
                 self.process_response()
 
@@ -131,25 +107,22 @@ class Message:
 
         if self._request_queued:
             if not self._send_buffer:
-                self._set_selector_events_mask("rw")
+                self._request_queued = False
+
 
     def close(self):
         print("closing connection to", self.addr)
         try:
             self.selector.unregister(self.sock)
         except Exception as e:
-            print(
-                "error: selector.unregister() exception for",
-                f"{self.addr}: {repr(e)}",
-            )
+            print("error: selector.unregister() exception for",
+                f"{self.addr}: {repr(e)}")
 
         try:
             self.sock.close()
         except OSError as e:
-            print(
-                "error: socket.close() exception for",
-                f"{self.addr}: {repr(e)}",
-            )
+            print("error: socket.close() exception for",
+                f"{self.addr}: {repr(e)}")
         finally:
             # Delete reference to socket object for garbage collection
             self.sock = None
@@ -166,9 +139,7 @@ class Message:
 
     def process_protoheader(self):
         hdrlen = 2
-        # print('process_protoheader')
         if len(self._recv_buffer) >= hdrlen:
-            print('IN process_protoheader')
             self._jsonheader_len = struct.unpack(
                 ">H", self._recv_buffer[:hdrlen])[0]
             self._recv_buffer = self._recv_buffer[hdrlen:]
@@ -197,7 +168,8 @@ class Message:
         self._recv_buffer = self._recv_buffer[content_len:]
         # binary response
         self.response = data
-        print(f'received {self.jsonheader["content-type"]} response from {self.addr}')
+        if self.mode == 'debug':
+            print(f'received {self.jsonheader["content-type"]} response from {self.addr}')
         self._process_binary_response()
         
         self._jsonheader_len = None
