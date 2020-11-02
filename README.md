@@ -32,6 +32,8 @@ usage: ./app_server.py <host> <port> <mode>
 <mode> must equal to 'user' or 'debug'
 (sock) ~/multi-socket-apps$ ./app_server.py localhost 65432 user
 ```
+The *mode* option is for printing. *Debug mode* is more extensive than *user mode*.
+
 The same with a client app in a different terminal window:
 ```bash
 (sock) ~/multi-socket-apps$ ./app_client.py
