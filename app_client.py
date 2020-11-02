@@ -16,7 +16,8 @@ quit_key_pressed = False
 stat_key_pressed = False
 
 # Listener function
-def on_press(key):
+# key type - KeyCode
+def on_press(key): 
     global quit_key_pressed, stat_key_pressed
     print("Press 's' for statistics or 'q' to quit.")
     try:
@@ -43,7 +44,7 @@ def get_traceback(message):
         f"{message.addr}:\n{traceback.format_exc()}")
 
 
-def start_connection(host, port, mode):
+def start_connection(host: str, port: int, mode: str):
     addr = (host, port)
     print("starting connection to", addr)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -56,7 +57,7 @@ def start_connection(host, port, mode):
 
 if len(sys.argv) != 4:
     print("usage:", sys.argv[0], "<host> <port> <mode>")
-    print("<mode> equal to 'user' or 'debug'")
+    print("<mode> must equal to 'user' or 'debug'")
     sys.exit(1)
 
 host, port = sys.argv[1], int(sys.argv[2])

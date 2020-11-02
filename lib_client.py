@@ -6,7 +6,8 @@ import struct
 
 
 class Message:
-    def __init__(self, selector, sock, addr, mode):
+    def __init__(self, selector: selectors.EpollSelector,
+            sock, addr: tuple, mode: str):
         self.selector = selector
         self.sock = sock
         self.addr = addr
@@ -47,10 +48,10 @@ class Message:
             else:
                 self._send_buffer = self._send_buffer[sent:]
 
-    def _json_encode(self, obj, encoding):
+    def _json_encode(self, obj: dict, encoding: str):
         return json.dumps(obj, ensure_ascii=False).encode(encoding)
 
-    def _json_decode(self, json_bytes, encoding):
+    def _json_decode(self, json_bytes: bytes, encoding: str) -> dict:
         tiow = io.TextIOWrapper(
             io.BytesIO(json_bytes), encoding=encoding, newline=""
         )
@@ -59,8 +60,8 @@ class Message:
         return obj
 
     def _create_message(self, *,
-        content_bytes, content_type, content_encoding
-    ):
+        content_bytes: bytes, content_type: str, content_encoding: str
+    ) -> bytes:
         jsonheader = {
             "byteorder": sys.byteorder,
             "content-type": content_type,
@@ -78,7 +79,7 @@ class Message:
         print(f"got response: {repr(content)}")
 
 
-    def set_request(self, content):
+    def set_request(self, content: bytes):
         self.request = dict(
             type="binary/custom-client-binary-type",
             encoding="binary",

@@ -10,7 +10,7 @@ import lib_server
 sel = selectors.DefaultSelector()
 
 
-def accept_wrapper(sock, mode):
+def accept_wrapper(sock, mode: str):
     conn, addr = sock.accept()  # Should be ready to read
     print("accepted connection from", addr)
     conn.setblocking(False)
@@ -41,6 +41,7 @@ try:
     while True:
         events = sel.select(timeout=None)
         for key, mask in events:
+            print('TYPEEE',type(mask))
             if key.data is None:
                 accept_wrapper(key.fileobj, mode)
             else:

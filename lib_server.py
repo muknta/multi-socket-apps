@@ -13,14 +13,15 @@ import time
 
 MAX_CHARS_NUM = 5
 MAX_SLEEP_TIME = 5
+CHARS_RANGE = f'{ascii_uppercase}{ascii_lowercase}{digits}'
 
 def get_rand_chars():
-    chars = f'{ascii_uppercase}{ascii_lowercase}{digits}'
-    return ''.join(choice(chars) for _ in range(randint(1, MAX_CHARS_NUM)))
+    return ''.join(choice(CHARS_RANGE) for _ in range(randint(1, MAX_CHARS_NUM)))
 
 
 class Message:
-    def __init__(self, selector, sock, addr, mode):
+    def __init__(self, selector: selectors.EpollSelector,
+            sock, addr: tuple, mode: str):
         self.selector = selector
         self.sock = sock
         self.addr = addr
@@ -59,10 +60,10 @@ class Message:
             else:
                 self._send_buffer = self._send_buffer[sent:]
 
-    def _json_encode(self, obj, encoding):
+    def _json_encode(self, obj: dict, encoding: str):
         return json.dumps(obj, ensure_ascii=False).encode(encoding)
 
-    def _json_decode(self, json_bytes, encoding):
+    def _json_decode(self, json_bytes: bytes, encoding: str):
         tiow = io.TextIOWrapper(
             io.BytesIO(json_bytes), encoding=encoding, newline=""
         )
@@ -71,8 +72,8 @@ class Message:
         return obj
 
     def _create_message(self, *,
-        content_bytes, content_type, content_encoding
-    ):
+        content_bytes: bytes, content_type: str, content_encoding: str
+    ) -> bytes:
         if self.mode == 'user':
             print(f"sending {content_bytes} to {self.addr}")
             
@@ -89,7 +90,7 @@ class Message:
         return message
 
 
-    def _create_binary_response(self):
+    def _create_binary_response(self) -> dict:
         self.sleep_time = randint(1, MAX_SLEEP_TIME)
         time.sleep(self.sleep_time)
         print(f'sleepy for a {self.sleep_time}',
@@ -104,7 +105,7 @@ class Message:
         self.symb_increment += len(chars)
         return response
 
-    def _create_statistics_response(self):
+    def _create_statistics_response(self) -> dict:
         response = {
             "content_bytes": b"Statistics: "
                 + str.encode(f'{self.symb_increment} symbols was delivered'),
@@ -114,7 +115,7 @@ class Message:
         self.symb_increment = 0
         return response
 
-    def process_events(self, mask):
+    def process_events(self, mask: int):
         if mask & selectors.EVENT_READ:
             self.read()
         if mask & selectors.EVENT_WRITE:
@@ -199,6 +200,6 @@ class Message:
         elif self.mode == 'user':
             print(f'received request from {self.addr}')
 
-    def process_responce(self, response):
+    def process_responce(self, response: dict):
         message = self._create_message(**response)
         self._send_buffer += message
