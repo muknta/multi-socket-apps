@@ -26,7 +26,10 @@ def on_press(key):
             quit_key_pressed = True
             return False
     except AttributeError as e:
-        print(f'Exception: {e}')
+        if mode == 'debug':
+            print(f'error: {e}')
+        elif mode == 'user':
+            print('be careful with excess pressing, young man')
 
 
 def detect_key_press():

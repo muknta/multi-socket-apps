@@ -156,6 +156,7 @@ class Message:
                 "content-length",
                 "content-type",
                 "content-encoding",
+                "sleep_time",
             ):
                 if reqhdr not in self.jsonheader:
                     raise ValueError(f'Missing required header "{reqhdr}".')
@@ -170,6 +171,8 @@ class Message:
         self.response = data
         if self.mode == 'debug':
             print(f'received {self.jsonheader["content-type"]} response from {self.addr}')
+        print(f'sleepy for a {self.jsonheader["sleep_time"]}',
+            f'second{"" if self.jsonheader["sleep_time"]==1 else "s"}')
         self._process_binary_response()
         
         self._jsonheader_len = None

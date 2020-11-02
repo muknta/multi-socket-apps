@@ -48,6 +48,8 @@ class Message:
 
     def _write(self):
         if self._send_buffer:
+            if self.mode == 'debug':
+                print(f"sending {repr(self._send_buffer)} to {self.addr}")
             try:
                 # Should be ready to write
                 sent = self.sock.send(self._send_buffer)
@@ -79,6 +81,7 @@ class Message:
             "content-type": content_type,
             "content-encoding": content_encoding,
             "content-length": len(content_bytes),
+            "sleep_time": self.sleep_time,
         }
         jsonheader_bytes = self._json_encode(jsonheader, "utf-8")
         message_hdr = struct.pack(">H", len(jsonheader_bytes))
@@ -132,7 +135,7 @@ class Message:
                 self.process_request()
 
     def write(self):
-        if self.request is b"s":
+        if self.request in (b"s", "s"):
             response = self._create_statistics_response()
             self.process_responce(response)
 
@@ -199,5 +202,3 @@ class Message:
     def process_responce(self, response):
         message = self._create_message(**response)
         self._send_buffer += message
-        if self.mode == 'debug':
-            print(f"sending {repr(self._send_buffer)} to {self.addr}")
