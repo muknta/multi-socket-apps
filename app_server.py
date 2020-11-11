@@ -4,8 +4,19 @@ import sys
 import socket
 import selectors
 import traceback
+import ssl
 # package with Message class
 import lib_server
+
+#To fix certificate issue
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    # Legacy Python that doesn't verify HTTPS certificates by default
+    pass
+else:
+    # Handle target environment that doesn't support HTTPS verification
+    ssl._create_default_https_context = _create_unverified_https_context
 
 sel = selectors.DefaultSelector()
 
@@ -28,14 +39,23 @@ if len(sys.argv) != 4:
 host, port = sys.argv[1], int(sys.argv[2])
 mode = sys.argv[3]
 
-lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # Avoid bind() exception: OSError: [Errno 48] Address already in use
-lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-lsock.bind((host, port))
-lsock.listen()
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+sock.bind((host, port))
+sock.listen()
 print("listening on", (host, port))
-lsock.setblocking(False)
-sel.register(lsock, selectors.EVENT_READ, data=None)
+# sock.setblocking(False)
+
+ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+# ctx.verify_mode = ssl.CERT_REQUIRED
+# ctx.load_verify_locations("certs/CA.pem")
+ctx.load_cert_chain('certs/server.pem', 'certs/server.key')
+
+# replace the socket with an ssl version of itself
+sslsoc = ctx.wrap_socket(sock, server_side=True)
+
+sel.register(sslsoc, selectors.EVENT_READ, data=None)
 
 try:
     while True:

